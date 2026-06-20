@@ -29,7 +29,8 @@ const (
 	minColors       = 2
 	finalShrink     = "25%"
 	faceShrink      = "128x128\\>"
-	posterizeFace   = "4"
+	//faceShrink    = "64x32\\>"
+	posterizeFace = "4"
 
 	kramBlockSize = "8x8"
 	kramQuality   = "80"
@@ -97,11 +98,11 @@ func getGroup(path string) string {
 		}
 	}
 
-	fileName = strings.TrimPrefix(strings.TrimSuffix(fileName, filepath.Ext(fileName)), "tx_")
-
 	if isAFace(fileName) {
 		return fileName
 	}
+
+	fileName = strings.TrimPrefix(strings.TrimSuffix(fileName, filepath.Ext(fileName)), "tx_")
 
 	// prefix determines which group the texture is posterized with.
 
