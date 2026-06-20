@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"log"
 	"os"
@@ -27,6 +28,7 @@ const (
 	posterizeNormal = "3"
 	minColors       = 2
 	finalShrink     = "25%"
+	faceShrink      = "256x256>"
 
 	kramBlockSize = "8x8"
 	kramQuality   = "80"
@@ -61,6 +63,20 @@ var blocklist = []string{
 	"td_detect_enemy_icon.dds",
 	"td_detect_humanoid_icon.dds",
 	"td_detect_invisibility_icon.dds",
+}
+
+// Load up the list of faces into a map.
+
+//go:embed faces.txt
+var faces string
+var faceMap map[string]any
+
+func init() {
+	faceMap = make(map[string]any)
+	exists := struct{}{}
+	for line := range strings.SplitSeq(faces, "\n") {
+		faceMap[line] = exists
+	}
 }
 
 // envOverride sets a custom policy file for magick
@@ -296,6 +312,15 @@ func shrink(ctx context.Context, rootDir string, outDir string) {
 	fmt.Printf("Groups: %d, Posterized files: %d, Segmented files: %d\n", len(filesByPrefix), posterizedFileCount.Load(), segmentedFileCount.Load())
 }
 
+func getShrinkAmount(filePath string) string {
+	base := filepath.Base(filePath)
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	if _, ok := faceMap[base]; ok {
+		return faceShrink
+	}
+	return finalShrink
+}
+
 func processFile(
 	f, colorMapFile string,
 	repath func(string) (string, error),
@@ -327,7 +352,7 @@ func processFile(
 		f,
 		"-alpha", "extract",
 		"-depth", "8",
-		"-resize", finalShrink, "-filter", "Lanczos", // ← resize here, not during composite
+		"-resize", getShrinkAmount(outputFilePath), "-filter", "Lanczos", // ← resize here, not during composite
 		alphaPath,
 	}, envOverride); err != nil {
 		return fmt.Errorf("failed to extract alpha: %w", err)
