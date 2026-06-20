@@ -29,6 +29,7 @@ const (
 	minColors       = 2
 	finalShrink     = "25%"
 	faceShrink      = "128x128\\>"
+	posterizeFace   = "4"
 
 	kramBlockSize = "8x8"
 	kramQuality   = "80"
@@ -97,6 +98,10 @@ func getGroup(path string) string {
 	}
 
 	fileName = strings.TrimPrefix(strings.TrimSuffix(fileName, filepath.Ext(fileName)), "tx_")
+
+	if isAFace(fileName) {
+		return fileName
+	}
 
 	// prefix determines which group the texture is posterized with.
 
@@ -277,11 +282,16 @@ func shrink(ctx context.Context, rootDir string, outDir string) {
 				return fmt.Errorf("failed to shrink prefix %q: %w", prefix, err)
 			}
 
+			posterize := posterizeNormal
+			if isAFace(prefix) {
+				posterize = posterizeFace
+			}
+
 			// Pass 2: posterize the buffer to build a shared color map.
 			posterizeCmd := exec.Command("magick",
 				"-", "-background", "none", "-append",
 				"-channel", "RGB", "-alpha", "off",
-				"-posterize", posterizeNormal, "-unique-colors", colorMapFile)
+				"-posterize", posterize, "-unique-colors", colorMapFile)
 			posterizeCmd.Env = envOverride
 			posterizeCmd.Stdin = buf
 			posterizeCmd.Stderr = os.Stderr
