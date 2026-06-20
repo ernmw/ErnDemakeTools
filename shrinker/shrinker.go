@@ -28,7 +28,7 @@ const (
 	posterizeNormal = "3"
 	minColors       = 2
 	finalShrink     = "25%"
-	faceShrink      = "256x256\\>"
+	faceShrink      = "128x128\\>"
 
 	kramBlockSize = "8x8"
 	kramQuality   = "80"
@@ -313,13 +313,11 @@ func shrink(ctx context.Context, rootDir string, outDir string) {
 	fmt.Printf("Groups: %d, Posterized files: %d, Segmented files: %d\n", len(filesByPrefix), posterizedFileCount.Load(), segmentedFileCount.Load())
 }
 
-func getShrinkAmount(filePath string) string {
+func isAFace(filePath string) bool {
 	base := filepath.Base(filePath)
 	base = strings.ToLower(strings.TrimSuffix(base, filepath.Ext(base)))
-	if _, ok := faceMap[base]; ok {
-		return faceShrink
-	}
-	return finalShrink
+	_, ok := faceMap[base]
+	return ok
 }
 
 func processFile(
@@ -349,26 +347,34 @@ func processFile(
 	alphaFile.Close()
 	defer os.Remove(alphaPath)
 
-	shrinkAmount := getShrinkAmount(outputFilePath)
+	isFace := isAFace(outputFilePath)
 
+	shrinkAmount := finalShrink
+	filter := "Point"
+	if isFace {
+		shrinkAmount = faceShrink
+		filter = "Lanczos"
+	}
+
+	// resize alpha channel
 	if err := runProc("magick", []string{
 		f,
 		"-alpha", "extract",
 		"-depth", "8",
-		"-resize", shrinkAmount, "-filter", "Lanczos", // ← resize here, not during composite
+		"-resize", shrinkAmount, "-filter", "Lanczos",
 		alphaPath,
 	}, envOverride); err != nil {
 		return fmt.Errorf("failed to extract alpha: %w", err)
 	}
 
-	// Remap colors (no alpha, no resize — alpha is already pre-resized).
+	// resize non-alpha channels
 	args := []string{
 		f,
 		"-alpha", "off",
 		"-channel", "RGB",
 		"-remap", colorMapFile,
 		"+channel",
-		"-resize", shrinkAmount, "-filter", "Point", // keep Point for RGB (posterized look)
+		"-resize", shrinkAmount, "-filter", filter,
 	}
 	if reduceValueContrast(outputFilePath) {
 		args = append(args, "-brightness-contrast", "0x-50")
