@@ -28,7 +28,7 @@ const (
 	posterizeNormal = "3"
 	minColors       = 2
 	finalShrink     = "25%"
-	faceShrink      = "256x256>"
+	faceShrink      = "256x256\\>"
 
 	kramBlockSize = "8x8"
 	kramQuality   = "80"
@@ -75,8 +75,9 @@ func init() {
 	faceMap = make(map[string]any)
 	exists := struct{}{}
 	for line := range strings.SplitSeq(faces, "\n") {
-		faceMap[line] = exists
+		faceMap[strings.ToLower(line)] = exists
 	}
+	fmt.Printf("Found %d face entries.\n", len(faceMap))
 }
 
 // envOverride sets a custom policy file for magick
@@ -314,7 +315,7 @@ func shrink(ctx context.Context, rootDir string, outDir string) {
 
 func getShrinkAmount(filePath string) string {
 	base := filepath.Base(filePath)
-	base = strings.TrimSuffix(base, filepath.Ext(base))
+	base = strings.ToLower(strings.TrimSuffix(base, filepath.Ext(base)))
 	if _, ok := faceMap[base]; ok {
 		return faceShrink
 	}
@@ -348,11 +349,13 @@ func processFile(
 	alphaFile.Close()
 	defer os.Remove(alphaPath)
 
+	shrinkAmount := getShrinkAmount(outputFilePath)
+
 	if err := runProc("magick", []string{
 		f,
 		"-alpha", "extract",
 		"-depth", "8",
-		"-resize", getShrinkAmount(outputFilePath), "-filter", "Lanczos", // ← resize here, not during composite
+		"-resize", shrinkAmount, "-filter", "Lanczos", // ← resize here, not during composite
 		alphaPath,
 	}, envOverride); err != nil {
 		return fmt.Errorf("failed to extract alpha: %w", err)
@@ -365,7 +368,7 @@ func processFile(
 		"-channel", "RGB",
 		"-remap", colorMapFile,
 		"+channel",
-		"-resize", finalShrink, "-filter", "Point", // keep Point for RGB (posterized look)
+		"-resize", shrinkAmount, "-filter", "Point", // keep Point for RGB (posterized look)
 	}
 	if reduceValueContrast(outputFilePath) {
 		args = append(args, "-brightness-contrast", "0x-50")
