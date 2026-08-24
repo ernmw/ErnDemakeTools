@@ -85,6 +85,29 @@ func init() {
 // envOverride sets a custom policy file for magick
 var envOverride = []string{"MAGICK_CONFIGURE_PATH=."}
 
+var projectPrefixes = map[string]bool{
+	"bm": true,
+	"els": true,
+	"epos": true,
+	"hf": true,
+	"hr": true,
+	"pc": true,
+	"pi": true,
+	"sky": true,
+	"tr": true,
+}
+
+func stripProjectPrefix(inp string) string {
+	parts := strings.SplitN(inp, "_", 2)
+	if len(parts) != 2 {
+		return inp
+	}
+	if _, ok := projectPrefixes[parts[0]]; ok {
+		return parts[1]
+	}
+	return inp
+}
+
 // getGroup returns a key that will group this file with other files that have the same key.
 // If grouped, they are posterized together and will share the same pallete.
 // If this returns an empty string, it is not processed by shrinker.
@@ -102,7 +125,8 @@ func getGroup(path string) string {
 		return fileName
 	}
 
-	fileName = strings.TrimPrefix(strings.TrimSuffix(fileName, filepath.Ext(fileName)), "tx_")
+	fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName))
+	fileName = stripProjectPrefix(fileName)
 
 	// prefix determines which group the texture is posterized with.
 
@@ -274,13 +298,14 @@ func shrink(ctx context.Context, rootDir string, outDir string) {
 
 			// Pass 1: shrink all files in the group into a buffer.
 			buf := new(bytes.Buffer)
-			shrinkCmd := exec.Command("magick", append(files,
-				"-resize", colorMapShrink, "-filter", "Point", "png:-")...)
+			shrinkArgs := append(files,
+				"-resize", colorMapShrink, "-filter", "Point", "png:-")
+			shrinkCmd := exec.Command("magick", shrinkArgs...)
 			shrinkCmd.Env = envOverride
 			shrinkCmd.Stderr = os.Stderr
 			shrinkCmd.Stdout = buf
 			if err := shrinkCmd.Run(); err != nil {
-				return fmt.Errorf("failed to shrink prefix %q: %w", prefix, err)
+				return fmt.Errorf("failed to shrink prefix %q: %w. 'magick %s'", prefix, err, strings.Join(shrinkArgs, " "))
 			}
 
 			posterize := posterizeNormal
