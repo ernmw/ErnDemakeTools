@@ -353,7 +353,13 @@ func isAFace(filePath string) bool {
 	base := filepath.Base(filePath)
 	base = strings.ToLower(strings.TrimSuffix(base, filepath.Ext(base)))
 	_, ok := faceMap[base]
-	return ok
+	if ok {
+		return true
+	}
+	if strings.Contains(base, "_m_h_0") || strings.Contains(base, "_f_h_0") || strings.Contains(base, "_m_h_1") || strings.Contains(base, "_f_h_1") {
+		return true
+	}
+	return false
 }
 
 func processFile(
